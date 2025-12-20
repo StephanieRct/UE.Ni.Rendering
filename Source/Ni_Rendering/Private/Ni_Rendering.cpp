@@ -1,6 +1,11 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Ni_Rendering.h"
+#include "Ni_Rendering/Public/Components.h"
+#include "Ni_Rendering/Public/MeshChunk.h"
+#include "Ni_Rendering/Public/IndexChunk.h"
+#include "Ni_Rendering/Public/VertexChunk.h"
+#include "Ni_Rendering/Public/MeshBuilder.h"
 
 #define LOCTEXT_NAMESPACE "FNi_RenderingModule"
 
