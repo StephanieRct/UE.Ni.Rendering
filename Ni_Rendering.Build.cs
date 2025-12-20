@@ -26,7 +26,6 @@ public class Ni_Rendering : ModuleRules
 			new string[]
 			{
 				"Core",
-				"Ni",
 				// ... add other public dependencies that you statically link with here ...
 			}
 			);
