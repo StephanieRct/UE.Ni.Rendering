@@ -200,12 +200,13 @@ public:
 		, BodySetup(Component->GetBodySetup())
 		, MaterialRelevance(Component->GetMaterialRelevance(GetScene().GetShaderPlatform()))
 	{
+
 		// Copy each section
-		/// const int32 NumSections = Component->ProcMeshSections.Num();
-		/// Sections.AddZeroed(NumSections);
-		int SectionIdx = 0;
-		/// for (int SectionIdx = 0; SectionIdx < NumSections; SectionIdx++)
-		/// {
+		const int32 NumSections = 1;// Component->ProcMeshSections.Num();
+		Sections.AddZeroed(NumSections);
+		//int SectionIdx = 0;
+		for (int SectionIdx = 0; SectionIdx < NumSections; SectionIdx++)
+		{
 		/// 	FProcMeshSection& SrcSection = Component->ProcMeshSections[SectionIdx];
 		/// 	if (SrcSection.ProcIndexBuffer.Num() > 0 && SrcSection.ProcVertexBuffer.Num() > 0)
 		/// 	{
@@ -218,10 +219,10 @@ public:
 				TArray<FDynamicMeshVertex> Vertices;
 				Vertices.SetNumUninitialized(NumVerts);
 				Vertices[0] = FDynamicMeshVertex(FVector3f(0, 0, 0));
-				Vertices[1] = FDynamicMeshVertex(FVector3f(1, 0, 0));
-				Vertices[2] = FDynamicMeshVertex(FVector3f(1, 1, 0));
-				Vertices[3] = FDynamicMeshVertex(FVector3f(1, 1, 0));
-				Vertices[4] = FDynamicMeshVertex(FVector3f(0, 1, 0));
+				Vertices[1] = FDynamicMeshVertex(FVector3f(100, 0, 0));
+				Vertices[2] = FDynamicMeshVertex(FVector3f(100, 100, 0));
+				Vertices[3] = FDynamicMeshVertex(FVector3f(100, 100, 0));
+				Vertices[4] = FDynamicMeshVertex(FVector3f(0, 100, 0));
 				Vertices[5] = FDynamicMeshVertex(FVector3f(0, 0, 0));
 
 				ProcIndexBuffer.SetNumUninitialized(6);
@@ -286,7 +287,7 @@ public:
 				}
 #endif
 		/// 	}
-		/// }
+		}
 	}
 
 	virtual ~FNiMeshSceneProxy()
@@ -648,7 +649,7 @@ int32 UNiMeshComponent::GetNumMaterials() const
 
 FBoxSphereBounds UNiMeshComponent::CalcBounds(const FTransform& LocalToWorld) const
 {
-	return FBoxSphereBounds();
+	return FBoxSphereBounds(FSphere(FVector(0,0,0), 100));
 	//FBoxSphereBounds Ret(LocalBounds.TransformBy(LocalToWorld));
 	//
 	//Ret.BoxExtent *= BoundsScale;
