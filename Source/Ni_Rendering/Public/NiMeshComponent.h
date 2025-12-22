@@ -4,19 +4,18 @@
 
 #include "CoreMinimal.h"
 #include "Components/MeshComponent.h"
-#include "Ni/Public/Ni.h"
-#include "Runtime/public/StaticMesh.h"
+#include "Ni/Ni.h"
 
 #include "NiMeshComponent.generated.h"
 
-
-template<typename TChunkPointer>
-TChunkPointer MakeChunkPointer(const FStaticMeshVertexBuffers& buffers)
-{
-    buffers.
-    TChunkPointer::GetInternalChunk()
-    return 0;
-}
+//
+//template<typename TChunkPointer>
+//TChunkPointer MakeChunkPointer(const FStaticMeshVertexBuffers& buffers)
+//{
+//    buffers.
+//    TChunkPointer::GetInternalChunk()
+//    return 0;
+//}
 /**
  * 
  */
