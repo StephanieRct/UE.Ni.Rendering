@@ -24,6 +24,11 @@
 #include "NiRendering/NiVertexFactory.h"
 #include "NiRendering/Components.h"
 #include "Ni/Ni.h"
+
+#include "RHICommandList.h"
+
+
+#include <tuple>
 //#include "DynamicMeshBuilder.h"
 //#include "Materials/Material.h"
 //#include "Materials/MaterialRenderProxy.h"
@@ -38,53 +43,626 @@ DECLARE_CYCLE_STAT(TEXT("Update Collision"),		STAT_NiMeshComponent_UpdateCollisi
 
 #define NI_MESH_MAX_STATIC_TEXCOORDS 8
 
+namespace NiT::Rendering
+{
+	struct Policy
+	{
+		using Size_t = int32;
+		using Real_t = float;
+		using Real2_t = FVector2f;
+		using Real3_t = FVector3f;
+		using Color_t = FColor;
+		using Position3_t = Real3_t;
+		using UV_t = Real2_t;
+		using Normal3_t = Real3_t;
+		using Tangent3_t = Real3_t;
+	};
+
+	//template<typename TPolicy>
+	//struct CoVertexPosition3 : public Ni::NodeComponent
+	//{
+	//	using Policy_t = TPolicy;
+	//	typename Policy_t::Position3_t Position;
+	//};
+
+	//template<typename TPolicy>
+	//struct CoVertexNormal3 : public Ni::NodeComponent
+	//{
+	//	using Policy_t = TPolicy;
+	//	typename Policy_t::Normal3_t Normal;
+	//};
+
+	//template<typename TPolicy, typename TPolicy::Size_t TChannel>
+	//struct CoVertexUV : public Ni::NodeComponent
+	//{
+	//	using Policy_t = TPolicy;
+	//	typename Policy_t::UV_t UV;
+	//};
+
+	//template<typename TPolicy, typename TPolicy::Size_t TChannel>
+	//struct CoVertexColor : public Ni::NodeComponent
+	//{
+	//	using Policy_t = TPolicy;
+	//	typename Policy_t::Color_t Color;
+	//};
+
+	//template<typename TPolicy>
+	//struct CoVertexTangentX3 : public Ni::NodeComponent
+	//{
+	//	using Policy_t = TPolicy;
+	//	typename Policy_t::Tangent3_t Tangent;
+	//};
+	//template<typename TPolicy>
+	//struct CoVertexTangentZ3 : public Ni::NodeComponent
+	//{
+	//	using Policy_t = TPolicy;
+	//	typename Policy_t::Tangent3_t Tangent;
+	//	typename Policy_t::Real_t Determinant;
+	//};
+
+
+	template<typename T>
+	struct CoVertexPosition3 : public Ni::NodeComponent
+	{
+		T Value;
+	};
+
+	template<typename T>
+	struct CoVertexNormal3 : public Ni::NodeComponent
+	{
+		T Value;
+	};
+
+	template<typename T, uint32 TChannel>
+	struct CoVertexUV : public Ni::NodeComponent
+	{
+		T Value;
+	};
+
+	template<typename T, uint32 TChannel>
+	struct CoVertexColor : public Ni::NodeComponent
+	{
+		T Value;
+	};
+
+	template<typename T>
+	struct CoVertexTangentX3 : public Ni::NodeComponent
+	{
+		T Value;
+	};
+	template<typename T>
+	struct CoVertexTangentZ3 : public Ni::NodeComponent
+	{
+		T Value;
+	};
+	template<typename T>
+	struct CoIndex : public Ni::NodeComponent
+	{
+		T Value;
+	};
+
+	//struct CoNormal3 : public Ni::NodeComponent
+	//{
+	//public:
+	//	FVector Normal;
+	//};
+
+	//template<Ni::Size_t TChannel>
+	//struct CoUV : public Ni::NodeComponent
+	//{
+	//public:
+	//	FVector2D UV;
+	//};
+
+	//struct CoColor : public Ni::NodeComponent
+	//{
+	//public:
+	//	FColor Color;
+	//};
+	//struct CoTangent3 : public Ni::NodeComponent
+	//{
+	//public:
+	//	FProcMeshTangent Tangent;
+	//};
+
+
+	//template<typename TIndex>
+	//struct CoIndex : public Ni::NodeComponent
+	//{
+	//public:
+	//	TIndex Index;
+	//};
+}
+
 struct NiMeshPolicy
 {
+public:
 	using Size_t = int32;
+	using Index_t = uint32;
 	using Real_t = float;
-	using Real2_t = FVector2D;
-	using Real3_t = FVector;
+	using Real2_t = FVector2f;
+	using Real3_t = FVector3f;
+	using Real4_t = FVector4f;
 	using Color_t = FColor;
 	using Position3_t = Real3_t;
 	using UV_t = Real2_t;
 	using Normal3_t = Real3_t;
-	using Tangent3_t = Real3_t;
+	using TangentX3_t = Real3_t;
+	using TangentZ3_t = Real4_t; // w is sign of normal
+};
+//
+//using CoVertexPosition3 = NiT::Rendering::CoVertexPosition3<NiMeshPolicy>;
+//using CoVertexNormal3 = NiT::Rendering::CoVertexNormal3<NiMeshPolicy>;
+//template<NiMeshPolicy::Size_t TChannel>
+//using CoVertexUV = NiT::Rendering::CoVertexUV<NiMeshPolicy, TChannel>;
+//template<NiMeshPolicy::Size_t TChannel>
+//using CoVertexColor = NiT::Rendering::CoVertexColor<NiMeshPolicy, TChannel>;
+//using CoVertexTangentX3 = NiT::Rendering::CoVertexTangentX3<NiMeshPolicy>;
+//using CoVertexTangentZ3 = NiT::Rendering::CoVertexTangentZ3<NiMeshPolicy>;
+//using CoIndex = NiT::Rendering::CoIndex<NiMeshPolicy>;
+//
+
+
+using CoVertexPosition3 = NiT::Rendering::CoVertexPosition3<NiMeshPolicy::Position3_t>;
+using CoVertexNormal3 = NiT::Rendering::CoVertexNormal3<NiMeshPolicy::Normal3_t>;
+template<NiMeshPolicy::Size_t TChannel>
+using CoVertexUV = NiT::Rendering::CoVertexUV<NiMeshPolicy::UV_t, TChannel>;
+template<NiMeshPolicy::Size_t TChannel>
+using CoVertexColor = NiT::Rendering::CoVertexColor<NiMeshPolicy::Color_t, TChannel>;
+using CoVertexTangentX3 = NiT::Rendering::CoVertexTangentX3<NiMeshPolicy::TangentX3_t>;
+using CoVertexTangentZ3 = NiT::Rendering::CoVertexTangentZ3<NiMeshPolicy::TangentZ3_t>;
+using CoIndex = NiT::Rendering::CoIndex<NiMeshPolicy::Index_t>;
+
+
+
+
+
+
+
+
+
+class FCoUEVertexBuffer : public FVertexBuffer, public Ni::NodeComponent
+{
+public:
+	using Base_t = FVertexBuffer;
+	const Ni::NChunkPointer* VertexChunkPointer;
+	const Ni::Size_t ComponentDataTypeIndex;
+	const uint32 AttributeIndex;
+	FCoUEVertexBuffer(const Ni::NChunkPointer* vertexChunkPointer, const Ni::Size_t componentDataTypeIndex, const uint32 attributeIndex)
+		: VertexChunkPointer(vertexChunkPointer)
+		, ComponentDataTypeIndex(componentDataTypeIndex)
+		, AttributeIndex(attributeIndex)
+	{
+	}
+	virtual void InitRHI(FRHICommandListBase& RHICmdList) override
+	{
+		auto vertexCount = VertexChunkPointer->GetNodeCount();
+		const Ni::ComponentType& componentType = VertexChunkPointer->GetStructure().GetComponentType(ComponentDataTypeIndex);
+		auto vertexSize = componentType.GetSize();
+		auto dataSize = vertexCount * vertexSize;
+		Create(TEXT("FCoUEVertexBuffer"), RHICmdList, vertexSize, dataSize);
+		const void* data = VertexChunkPointer->GetComponentData(ComponentDataTypeIndex);
+		Upload(RHICmdList, data, dataSize);
+	}
+	Ni::Size_t GetVertexSize()const
+	{
+		return VertexChunkPointer->GetStructure().GetComponentType(ComponentDataTypeIndex).GetSize();
+	}
+protected:
+	void Create(const TCHAR* debugName, FRHICommandListBase& RHICmdList, const Ni::Size_t vertexSize, const Ni::Size_t vertexCount)
+	{
+		FRHIBufferCreateDesc desc = FRHIBufferCreateDesc::Create(debugName, vertexSize * vertexCount, vertexSize, BUF_VertexBuffer | BUF_ShaderResource | BUF_Dynamic);
+		desc.InitialState = ERHIAccess::VertexOrIndexBuffer;
+		VertexBufferRHI = RHICmdList.CreateBuffer(desc);
+	}
+	void Upload(FRHICommandListBase& RHICmdList, const void* data, const Ni::Size_t dataSize)
+	{
+		void* bufferData = RHICmdList.LockBuffer(VertexBufferRHI, 0, dataSize, EResourceLockMode::RLM_WriteOnly);
+		FMemory::Memcpy(bufferData, data, dataSize);
+		RHICmdList.UnlockBuffer(VertexBufferRHI);
+	}
 };
 
-using CoVertexPosition3 = NiT::Rendering::CoVertexPosition3<NiMeshPolicy>;
 
-//class FNiVertexBuffer : public FVertexBuffer
+class FCoUEIndexBuffer : public FIndexBuffer, public Ni::NodeComponent
+{
+public:
+	using Base_t = FIndexBuffer;
+	const Ni::NChunkPointer* IndexChunkPointer;
+	Ni::Size_t ComponentDataTypeIndex;
+	FCoUEIndexBuffer(const Ni::NChunkPointer* indexChunkPointer, const Ni::Size_t componentDataTypeIndex)
+		: IndexChunkPointer(indexChunkPointer)
+		, ComponentDataTypeIndex(componentDataTypeIndex)
+	{
+	}
+	virtual void InitRHI(FRHICommandListBase& RHICmdList) override
+	{
+		auto indexCount = IndexChunkPointer->GetNodeCount();
+		const Ni::ComponentType& componentType = IndexChunkPointer->GetStructure().GetComponentType(ComponentDataTypeIndex);
+		auto indexSize = componentType.GetSize();
+		auto dataSize = indexCount * indexSize;
+		Create(TEXT("FCoUEIndexBuffer"), RHICmdList, indexSize, dataSize);
+		const void* data = IndexChunkPointer->GetComponentData(ComponentDataTypeIndex);
+		Upload(RHICmdList, data, dataSize);
+	}
+	Ni::Size_t GetIndexSize()const
+	{
+		return IndexChunkPointer->GetStructure().GetComponentType(ComponentDataTypeIndex).GetSize();
+	}
+protected:
+	void Create(const TCHAR* debugName, FRHICommandListBase& RHICmdList, const Ni::Size_t indexSize, const Ni::Size_t indexCount)
+	{
+		FRHIBufferCreateDesc desc = FRHIBufferCreateDesc::Create(debugName, indexSize * indexCount, indexSize, BUF_IndexBuffer | BUF_ShaderResource | BUF_Dynamic);
+		desc.InitialState = ERHIAccess::VertexOrIndexBuffer;
+		IndexBufferRHI = RHICmdList.CreateBuffer(desc);
+	}
+	void Upload(FRHICommandListBase& RHICmdList, const void* data, const Ni::Size_t dataSize)
+	{
+		void* bufferData = RHICmdList.LockBuffer(IndexBufferRHI, 0, dataSize, EResourceLockMode::RLM_WriteOnly);
+		FMemory::Memcpy(bufferData, data, dataSize);
+		RHICmdList.UnlockBuffer(IndexBufferRHI);
+	}
+};
+
+
+//struct CoVertexChunk : public Ni::NBunch, public Ni::NodeComponent
 //{
 //public:
-//	Ni::NChunkPointer Chunk;
+//	using Base_t = Ni::NBunch;
+//	using Base_t::Base_t;
 //
-//	virtual void InitRHI(FRHICommandListBase& RHICmdList) override
-//	{
-//		// Create the buffer resource in the render thread
-//		FRHIResourceCreateInfo CreateInfo(TEXT("MyCustomVertexBuffer"));
-//		VertexBufferRHI = RHICreateBuffer(
-//			Chunk.GetNodeCount() * sizeof(FMyCustomVertex),
-//			BUF_Static | BUF_VertexBuffer, // Use BUF_Dynamic if updating per frame
-//			0,
-//			ERHIAccess::VertexOrIndexBuffer,
-//			CreateInfo
-//		);
+//	Ni::Size_t GetVertexCount()const { return GetNodeCount(); }
+//};
+//struct CoIndexChunk : public Ni::NBunch, public Ni::NodeComponent
+//{
+//public:
+//	using Base_t = Ni::NBunch;
+//	using Base_t::Base_t;
+//	Ni::Size_t GetIndexCount()const { return GetNodeCount(); }
+//};
 //
-//		// Copy the data to the GPU
-//		void* VertexBufferData = RHILockBuffer(VertexBufferRHI, 0, Vertices.Num() * sizeof(FMyCustomVertex), RHI_LOCK_WRITE);
-//		FMemory::Memcpy(VertexBufferData, Vertices.GetData(), Vertices.Num() * sizeof(FMyCustomVertex));
-//		RHIUnlockBuffer(VertexBufferRHI);
-//	}
-//
-//	// Don't forget to override ReleaseRHI to clean up the resource
-//	virtual void ReleaseRHI() override
-//	{
-//		//Vertices.Empty();
-//		FVertexBuffer::ReleaseRHI();
-//	}
+//struct CoUEMaterialRef : public Ni::NodeComponent
+//{
+//public:
+//	UMaterialInterface* Value;
 //};
 
-/** Class representing a single section of the proc mesh */
+struct UEVertexBufferChunk : public Ni::NBunch
+{
+public:
+	using Base_t = Ni::NBunch;
+	using Base_t::Base_t;
+	Ni::Size_t GetUEVertexBufferCount()const { return GetNodeCount(); }
+	const FCoUEVertexBuffer* GetUEVertexBufferData() const { return GetComponentData<FCoUEVertexBuffer>(); }
+	FCoUEVertexBuffer* GetUEVertexBufferData() { return GetComponentData<FCoUEVertexBuffer>(); }
+};
+struct UEIndexBufferChunk : public Ni::NBunch
+{
+public:
+	using Base_t = Ni::NBunch;
+	using Base_t::Base_t;
+	Ni::Size_t GetUEIndexBufferCount()const { return GetNodeCount(); }
+	const FCoUEIndexBuffer* GetUEIndexBufferData() const { return GetComponentData<FCoUEIndexBuffer>(); }
+	FCoUEIndexBuffer* GetUEIndexBufferData() { return GetComponentData<FCoUEIndexBuffer>(); }
+};
+
+struct CoMeshSection : public Ni::NodeComponent
+{
+	using IndexChunk_t = Ni::NBunch;
+	using VertexChunk_t = Ni::NBunch;
+	IndexChunk_t IndexChunk;
+	VertexChunk_t VertexChunk;
+	Ni::Size_t GetIndexCount()const { return IndexChunk.GetNodeCount(); }
+	Ni::Size_t GetVertexCount()const { return VertexChunk.GetNodeCount(); }
+};
+struct CoUEMeshSection : public Ni::NodeComponent
+{
+	using IndexChunk_t = Ni::NBunch;
+	using VertexChunk_t = Ni::NBunch;
+	IndexChunk_t UEIndexBufferChunk;
+	VertexChunk_t UEVertexBufferChunk;
+	UMaterialInterface* UEMaterial;
+
+#if RHI_RAYTRACING
+	Ni::Size_t RayTracingIndexBufferIndex;
+	Ni::Size_t RayTracingVertexPositionBufferIndex;
+	FRayTracingGeometry RayTracingGeometry;
+#endif
+
+	bool IsValid()const { return !!UEMaterial; }
+	Ni::Size_t GetUEIndexBufferCount()const { return UEIndexBufferChunk.GetNodeCount(); }
+	Ni::Size_t GetUEVertexBufferCount()const { return UEVertexBufferChunk.GetNodeCount(); }
+
+
+	const FCoUEIndexBuffer* GetUEIndexBufferData() const { return UEIndexBufferChunk.GetComponentData<FCoUEIndexBuffer>(); }
+	FCoUEIndexBuffer* GetUEIndexBufferData() { return UEIndexBufferChunk.GetComponentData<FCoUEIndexBuffer>(); }
+	const FCoUEVertexBuffer* GetUEVertexBufferData() const { return UEVertexBufferChunk.GetComponentData<FCoUEVertexBuffer>(); }
+	FCoUEVertexBuffer* GetUEVertexBufferData() { return UEVertexBufferChunk.GetComponentData<FCoUEVertexBuffer>(); }
+};
+
+struct MeshChunk 
+{
+public:
+	//using Base_t = Ni::NBunch;
+	Ni::NBunch Chunk;
+
+	MeshChunk() = default;
+	MeshChunk(const MeshChunk&) = default;
+	MeshChunk(MeshChunk&&) = default;
+	MeshChunk& operator=(const MeshChunk&) = default;
+	MeshChunk& operator=(MeshChunk&&) = default;
+
+
+	MeshChunk(const Ni::ChunkStructure* structure, const Ni::Size_t sectionCapacity, const Ni::Size_t sectionCount)
+		: Chunk(structure, Ni::NodeCapacity(sectionCapacity), Ni::NodeCount(sectionCount))
+	{
+	}
+
+	MeshChunk(const Ni::Size_t sectionCapacity, const Ni::Size_t sectionCount)
+		: Chunk(BaseStructure::GetBaseMeshStructure(), Ni::NodeCapacity(sectionCapacity), Ni::NodeCount(sectionCount))
+	{
+
+	}
+
+	Ni::NodeCount GetSectionCount()const { return Chunk.GetNodeCount(); }
+	const CoMeshSection& GetSection(Ni::Size_t sectionIndex)const { return Chunk.GetComponentData<CoMeshSection>(sectionIndex); }
+	CoMeshSection& GetSection(Ni::Size_t sectionIndex) { return Chunk.GetComponentData<CoMeshSection>(sectionIndex); }
+
+	Ni::NodeIndex AddSection()
+	{
+		return Chunk.AddNode();
+	}
+	Ni::NodeIndex AddSection(const Ni::Size_t indexCount, const Ni::Size_t vertexCount)
+	{
+		return AddSection(indexCount, indexCount, vertexCount, vertexCount);
+	}
+	Ni::NodeIndex AddSection(const Ni::Size_t indexCapacity, const Ni::Size_t indexCount, const Ni::Size_t vertexCapacity, const Ni::Size_t vertexCount)
+	{
+		const Ni::ChunkStructure* indexStructure = BaseStructure::GetBaseIndexStructure();
+		const Ni::ChunkStructure* vertexStructure = BaseStructure::GetBaseVertexStructure();
+
+		Ni::NodeIndex sectionIndex = AddSection();
+		CoMeshSection& section = GetSection(sectionIndex);
+		ni_assert(section.IndexChunk.IsNull());
+		ni_assert(section.VertexChunk.IsNull());
+		new(&section.IndexChunk) CoMeshSection::IndexChunk_t(indexStructure, indexCapacity, indexCount);
+		new(&section.VertexChunk) CoMeshSection::VertexChunk_t(vertexStructure, vertexCapacity, vertexCount);
+		return sectionIndex;
+	}
+	//CoIndexChunk& GetIndexChunk(const Ni::Size_t sectionIndex) { return Chunk.GetComponentData<CoIndexChunk>(Ni::NodeIndex(sectionIndex)); }
+	//const CoIndexChunk& GetIndexChunk(const Ni::Size_t sectionIndex) const { return Chunk.GetComponentData<CoIndexChunk>(Ni::NodeIndex(sectionIndex)); }
+
+	//CoVertexChunk& GetVertexChunk(const Ni::Size_t sectionIndex) { return Chunk.GetComponentData<CoVertexChunk>(Ni::NodeIndex(sectionIndex)); }
+	//const CoVertexChunk& GetVertexChunk(const Ni::Size_t sectionIndex) const{ return Chunk.GetComponentData<CoVertexChunk>(Ni::NodeIndex(sectionIndex)); }
+
+	//CoUEIndexBufferChunk& GetUEIndexBuffer(const Ni::Size_t sectionIndex) { return Chunk.GetComponentData<CoUEIndexBufferChunk>(Ni::NodeIndex(sectionIndex)); }
+	//const CoUEIndexBufferChunk& GetUEIndexBuffer(const Ni::Size_t sectionIndex) const { return Chunk.GetComponentData<CoUEIndexBufferChunk>(Ni::NodeIndex(sectionIndex)); }
+
+	//CoUEVertexBufferChunk& GetUEVertexBuffer(const Ni::Size_t sectionIndex) { return Chunk.GetComponentData<CoUEVertexBufferChunk>(Ni::NodeIndex(sectionIndex)); }
+	//const CoUEVertexBufferChunk& GetUEVertexBuffer(const Ni::Size_t sectionIndex) const { return Chunk.GetComponentData<CoUEVertexBufferChunk>(Ni::NodeIndex(sectionIndex)); }
+
+	//CoUEMaterialRef& GetSectionMaterial(const Ni::Size_t sectionIndex) { return Chunk.GetComponentData<CoUEMaterialRef>(sectionIndex); }
+	//const CoUEMaterialRef& GetSectionMaterial(const Ni::Size_t sectionIndex)const { return Chunk.GetComponentData<CoUEMaterialRef>(sectionIndex); }
+
+	const CoUEMeshSection& GetUESection(const Ni::Size_t sectionIndex)const { return Chunk.GetComponentData<CoUEMeshSection>(sectionIndex); }
+	CoUEMeshSection& GetUESection(const Ni::Size_t sectionIndex) { return Chunk.GetComponentData<CoUEMeshSection>(sectionIndex); }
+	//CoUEMeshSection& GetOrCreateUESection(Ni::Size_t sectionIndex) 
+	//{
+	//	CoUEMeshSection& ueSection = GetUESection(sectionIndex);
+	//	if (ueSection.IsValid())
+	//		return ueSection;
+	//	CreateUESection(sectionIndex);
+	//	return GetUESection(sectionIndex);
+	//}
+	CoUEMeshSection& CreateUESection(const Ni::Size_t sectionIndex, UMaterialInterface*const ueMaterial)
+	{
+		const Ni::ChunkStructure* ueVertexBufferStructure = BaseStructure::GetBaseUEVertexBufferStructure();
+		const Ni::ChunkStructure* ueIndexBufferStructure = BaseStructure::GetBaseUEIndexBufferStructure();
+
+		CoMeshSection& section = GetSection(sectionIndex);
+		CoUEMeshSection& ueSection = GetUESection(sectionIndex);
+		auto indexBufferCount = section.IndexChunk.GetStructure().GetComponentCount();
+		auto vertexBufferCount = section.VertexChunk.GetStructure().GetComponentCount();
+
+		ni_assert(ueSection.UEIndexBufferChunk.IsNull());
+		ni_assert(ueSection.UEVertexBufferChunk.IsNull());
+		new(&ueSection.UEIndexBufferChunk) CoUEMeshSection::IndexChunk_t(ueIndexBufferStructure, indexBufferCount, 0);
+		new(&ueSection.UEVertexBufferChunk) CoUEMeshSection::VertexChunk_t(ueVertexBufferStructure, vertexBufferCount, 0);
+
+#if RHI_RAYTRACING
+		ueSection.RayTracingIndexBufferIndex = section.IndexChunk.GetStructure().GetComponentTypeIndexInChunk<CoIndex>();
+		ueSection.RayTracingVertexPositionBufferIndex = section.VertexChunk.GetStructure().GetComponentTypeIndexInChunk<CoVertexPosition3>();
+#endif
+		// Create a FCoUEIndexBuffer for each index buffer components;
+		FCoUEIndexBuffer* ueIndexBuffers = ueSection.GetUEIndexBufferData();
+		for (auto i = 0; i < indexBufferCount; ++i)
+		{
+			new(&ueIndexBuffers[i]) FCoUEIndexBuffer(&section.IndexChunk, i);
+		}
+		CoUEMeshSection::IndexChunk_t::GetInternalChunk(ueSection.UEIndexBufferChunk).NodeCount = Ni::NodeCount(indexBufferCount);
+
+		// Create a FCoUEVertexBuffer for each vertex buffer components;
+		FCoUEVertexBuffer* ueVertexBuffers = ueSection.GetUEVertexBufferData();
+		for (auto i = 0; i < vertexBufferCount; ++i)
+		{
+			new(&ueVertexBuffers[i]) FCoUEVertexBuffer(&section.VertexChunk, i, BaseStructure::GetBaseVertexAttributeIndex(i));
+		}
+		CoUEMeshSection::VertexChunk_t::GetInternalChunk(ueSection.UEVertexBufferChunk).NodeCount = Ni::NodeCount(vertexBufferCount);
+
+		for (auto i = 0; i < indexBufferCount; ++i)
+			BeginInitResource(&ueIndexBuffers[i]);
+
+		for (auto i = 0; i < vertexBufferCount; ++i)
+			BeginInitResource(&ueVertexBuffers[i]);
+		return ueSection;
+	}
+	//void InitUEResources(const Ni::Size_t sectionIndex)
+	//{
+	//	CoUEMeshSection& ueSection = GetUESection(sectionIndex);
+	//	FCoUEIndexBuffer* ueIndexBuffers = ueSection.GetUEIndexBufferData();
+	//	FCoUEVertexBuffer* ueVertexBuffers = ueSection.GetUEVertexBufferData();
+	//	auto indexBufferCount = ueSection.GetUEIndexBufferCount();
+	//	auto vertexBufferCount = ueSection.GetUEVertexBufferCount();
+
+	//	for (auto i = 0; i < indexBufferCount; ++i)
+	//		BeginInitResource(&ueIndexBuffers[i]);
+
+	//	for (auto i = 0; i < vertexBufferCount; ++i)
+	//		BeginInitResource(&ueVertexBuffers[i]);
+	//}
+
+	static struct BaseStructure
+	{
+		static auto GetBaseMeshStructureComponentTypes()
+		{
+			auto& reg = Ni::ComponentTypeRegistry::GetInstance();
+			return std::make_tuple(
+				reg.GetOrAddComponentType<CoMeshSection>(),
+				reg.GetOrAddComponentType<CoUEMeshSection>());
+		}
+		static const Ni::ChunkStructure* GetBaseMeshStructure()
+		{
+			static const Ni::ChunkStructure* value = Ni::ChunkStructureRegistry::GetInstance().GetOrAddChunkStructure(GetBaseMeshStructureComponentTypes());
+			return value;
+		}
+
+
+		static auto GetBaseIndexStructureComponentTypes()
+		{
+			auto& reg = Ni::ComponentTypeRegistry::GetInstance();
+			return std::make_tuple(reg.GetOrAddComponentType<CoIndex>());
+		}
+		static const Ni::ChunkStructure* GetBaseIndexStructure()
+		{
+			static const Ni::ChunkStructure* value = Ni::ChunkStructureRegistry::GetInstance().GetOrAddChunkStructure(GetBaseIndexStructureComponentTypes());
+			return value;
+		}
+
+
+		static auto GetBaseUEIndexBufferStructureComponentTypes()
+		{
+			auto& reg = Ni::ComponentTypeRegistry::GetInstance();
+			return std::make_tuple(
+				reg.GetOrAddComponentType<FCoUEIndexBuffer>());
+		}
+		static const Ni::ChunkStructure* GetBaseUEIndexBufferStructure()
+		{
+			static const Ni::ChunkStructure* value = Ni::ChunkStructureRegistry::GetInstance().GetOrAddChunkStructure(GetBaseUEIndexBufferStructureComponentTypes());
+			return value;
+		}
+
+
+
+		static uint32 GetBaseVertexAttributeIndex(const uint32 baseComponentIndex)
+		{
+			switch (baseComponentIndex)
+			{
+				case 0: return 0;
+				case 1: return 1;
+				case 2: return 2;
+				case 3: return 3;
+				case 4: return 4;
+				case 5: return 5;
+				case 6: return 6;
+				case 7: return 7;
+			}
+			checkNoEntry();
+			return -1;
+		}
+		static auto GetBaseVertexStructureComponentTypes()
+		{
+			auto& reg = Ni::ComponentTypeRegistry::GetInstance();
+			return std::make_tuple(
+				reg.GetOrAddComponentType<CoVertexPosition3>(),
+				reg.GetOrAddComponentType<CoVertexTangentX3>(),
+				reg.GetOrAddComponentType<CoVertexTangentZ3>(),
+				reg.GetOrAddComponentType<CoVertexColor<0>>(),
+				reg.GetOrAddComponentType<CoVertexUV<0>>(),
+				reg.GetOrAddComponentType<CoVertexUV<1>>(),
+				reg.GetOrAddComponentType<CoVertexUV<2>>(),
+				reg.GetOrAddComponentType<CoVertexUV<3>>()//,
+				//reg.GetOrAddComponentType<InstanceOrigin>(),
+				//reg.GetOrAddComponentType<InstanceTransform1>(),
+				//reg.GetOrAddComponentType<InstanceTransform2>(),
+				//reg.GetOrAddComponentType<InstanceTransform3>(),
+			);
+		}
+		static const Ni::ChunkStructure* GetBaseVertexStructure()
+		{
+			static const Ni::ChunkStructure* value = Ni::ChunkStructureRegistry::GetInstance().GetOrAddChunkStructure(GetBaseVertexStructureComponentTypes());
+			return value;
+		}
+
+
+		static auto GetBaseUEVertexBufferStructureComponentTypes()
+		{
+			auto& reg = Ni::ComponentTypeRegistry::GetInstance();
+			return std::make_tuple(
+				reg.GetOrAddComponentType<FCoUEVertexBuffer>());
+		}
+		static const Ni::ChunkStructure* GetBaseUEVertexBufferStructure()
+		{
+			static const Ni::ChunkStructure* value = Ni::ChunkStructureRegistry::GetInstance().GetOrAddChunkStructure(GetBaseUEVertexBufferStructureComponentTypes());
+			return value;
+		}
+	};
+	//FCoUEIndexBuffer
+};
+
+
+
+class FMeshChunkVertexFactory : public FVertexFactory
+{
+	DECLARE_VERTEX_FACTORY_TYPE_API(FMeshChunkVertexFactory, ENGINE_API);
+public:
+	ENGINE_API virtual ~FMeshChunkVertexFactory()
+	{
+
+	}
+
+	ENGINE_API virtual void InitRHI(FRHICommandListBase& RHICmdList) override
+	{
+		uint32 attributeIndex = 0;
+		uint32 offset = 0;
+		FVertexDeclarationElementList elements;
+		TEnumAsByte<EVertexElementType> VertexElementType = VET_None;
+
+		const auto sectionCount = Mesh->GetSectionCount();
+		for (auto iSection = 0; iSection < sectionCount; ++iSection)
+		{
+			const CoUEMeshSection& ueSection = Mesh->GetUESection(iSection);
+			//const CoUEVertexBufferChunk& bufferChunk = Mesh->GetUEVertexBuffer(iSection);
+			const auto bufferCount = ueSection.GetUEVertexBufferCount();
+			const FCoUEVertexBuffer* buffers = ueSection.GetUEVertexBufferData();
+			for (auto iBuffer = 0; iBuffer < bufferCount; ++iBuffer)
+			{ 
+				auto& buffer = buffers[iBuffer];
+				FVertexStream VertexStream;
+				VertexStream.VertexBuffer = &buffer;
+				VertexStream.Stride = buffer.GetVertexSize();
+				VertexStream.Offset = offset;
+				VertexStream.VertexStreamUsage = EVertexStreamUsage::Default;
+				FVertexElement vertexElement((uint8)Streams.AddUnique(VertexStream), offset, VertexElementType, buffer.AttributeIndex, VertexStream.Stride, EnumHasAnyFlags(EVertexStreamUsage::Instancing, VertexStream.VertexStreamUsage));
+
+				elements.Add(vertexElement);
+			}
+		}
+		//auto positionComponent = FVertexStreamComponent(&InVertexBuffer->PositionBuffer, 0, sizeof(FVector3f), VET_Float3, EVertexStreamUsage::Default);
+
+		AddPrimitiveIdStreamElement(EVertexInputStreamType::Default, elements, 13, 13);
+		InitDeclaration(elements);
+	}
+	virtual void ReleaseRHI() override
+	{
+		FVertexFactory::ReleaseRHI();
+	}
+	FVertexStreamComponent PositionComponent;
+	FRHIShaderResourceView* PositionComponentSRV = nullptr;
+	MeshChunk* Mesh;
+};
+
+
+
 class FNiMeshProxySection
 {
 public:
@@ -185,10 +763,10 @@ public:
 	//}
 };
 
-
 class FNiMeshSceneProxy final : public FPrimitiveSceneProxy
 {
 public:
+
 	SIZE_T GetTypeHash() const override
 	{
 		static size_t UniquePointer;
@@ -197,9 +775,104 @@ public:
 
 	FNiMeshSceneProxy(UNiMeshComponent* Component)
 		: FPrimitiveSceneProxy(Component)
+		, Chunk(1, 0)
 		, BodySetup(Component->GetBodySetup())
 		, MaterialRelevance(Component->GetMaterialRelevance(GetScene().GetShaderPlatform()))
 	{
+		const auto vertexCount = 6;
+		const auto indexCount = 6;
+		auto sectionIndex = Chunk.AddSection(indexCount, vertexCount);
+		CoMeshSection& section = Chunk.GetSection(sectionIndex);
+
+		CoIndex* indexData = section.IndexChunk.GetComponentData<CoIndex>();
+		indexData[0].Value = 0;
+		indexData[1].Value = 1;
+		indexData[2].Value = 2;
+		indexData[3].Value = 3;
+		indexData[4].Value = 4;
+		indexData[5].Value = 5;
+
+		CoVertexPosition3* posData = section.VertexChunk.GetComponentData<CoVertexPosition3>();
+		posData[0].Value = FVector3f(0, 0, 100);
+		posData[1].Value = FVector3f(100, 0, 100);
+		posData[2].Value = FVector3f(100, 100, 100);
+		posData[3].Value = FVector3f(100, 100, 100);
+		posData[4].Value = FVector3f(0, 100, 100);
+		posData[5].Value = FVector3f(0, 0, 100);
+
+		CoVertexTangentX3* tanXData = section.VertexChunk.GetComponentData<CoVertexTangentX3>();
+		tanXData[0].Value = FVector3f(1, 0, 0);
+		tanXData[1].Value = FVector3f(1, 0, 0);
+		tanXData[2].Value = FVector3f(1, 0, 0);
+		tanXData[3].Value = FVector3f(1, 0, 0);
+		tanXData[4].Value = FVector3f(1, 0, 0);
+		tanXData[5].Value = FVector3f(1, 0, 0);
+
+		CoVertexTangentZ3* tanZData = section.VertexChunk.GetComponentData<CoVertexTangentZ3>();
+		tanZData[0].Value = FVector4f(0, 1, 0, 1);
+		tanZData[1].Value = FVector4f(0, 1, 0, 1);
+		tanZData[2].Value = FVector4f(0, 1, 0, 1);
+		tanZData[3].Value = FVector4f(0, 1, 0, 1);
+		tanZData[4].Value = FVector4f(0, 1, 0, 1);
+		tanZData[5].Value = FVector4f(0, 1, 0, 1);
+
+		CoVertexUV<0>* uvData = section.VertexChunk.GetComponentData<CoVertexUV<0>>();
+		uvData[0].Value = FVector2f(0, 0);
+		uvData[1].Value = FVector2f(0, 0);
+		uvData[2].Value = FVector2f(0, 0);
+		uvData[3].Value = FVector2f(0, 0);
+		uvData[4].Value = FVector2f(0, 0);
+		uvData[5].Value = FVector2f(0, 0);
+
+		CoVertexColor<0>* colorData = section.VertexChunk.GetComponentData<CoVertexColor<0>>();
+		colorData[0].Value = FColor(1, 1, 1, 1);
+		colorData[1].Value = FColor(1, 1, 1, 1);
+		colorData[2].Value = FColor(1, 1, 1, 1);
+		colorData[3].Value = FColor(1, 1, 1, 1);
+		colorData[4].Value = FColor(1, 1, 1, 1);
+		colorData[5].Value = FColor(1, 1, 1, 1);
+
+		auto* material = Component->GetMaterial(sectionIndex);
+		if (!material)
+			material = UMaterial::GetDefaultMaterial(MD_Surface);
+		// create and init UE RHI buffers
+		CoUEMeshSection& ueSection = Chunk.CreateUESection(sectionIndex, material);
+		
+
+#if RHI_RAYTRACING
+		if (IsRayTracingEnabled())
+		{
+			ENQUEUE_RENDER_COMMAND(InitNiMeshRayTracingGeometry)(
+				[this, DebugName = Component->GetFName(), &section, &ueSection](FRHICommandListImmediate& RHICmdList)
+				{
+					FRayTracingGeometryInitializer Initializer;
+					Initializer.DebugName = DebugName;
+					const FCoUEIndexBuffer* indexBuffers = ueSection.GetUEIndexBufferData();
+					Initializer.IndexBuffer = indexBuffers[ueSection.RayTracingIndexBufferIndex].IndexBufferRHI;
+					Initializer.TotalPrimitiveCount = section.IndexChunk.GetNodeCount() / 3;
+					Initializer.GeometryType = RTGT_Triangles;
+					Initializer.bFastBuild = true;
+					Initializer.bAllowUpdate = false;
+
+					FRayTracingGeometrySegment Segment;
+					const FCoUEVertexBuffer* vertexBuffers = ueSection.GetUEVertexBufferData();
+					Segment.VertexBuffer = vertexBuffers[ueSection.RayTracingVertexPositionBufferIndex].VertexBufferRHI;
+					Segment.MaxVertices = section.VertexChunk.GetNodeCount();
+					Segment.NumPrimitives = Initializer.TotalPrimitiveCount;
+
+					Initializer.Segments.Add(Segment);
+
+					ueSection.RayTracingGeometry.SetInitializer(Initializer);
+					ueSection.RayTracingGeometry.InitResource(RHICmdList);
+				});
+		}
+#endif
+
+
+
+
+
+
 
 		// Copy each section
 		const int32 NumSections = 1;// Component->ProcMeshSections.Num();
@@ -292,6 +965,17 @@ public:
 
 	virtual ~FNiMeshSceneProxy()
 	{
+		for (auto iSection = 0; iSection < Chunk.GetSectionCount(); ++iSection)
+		{
+			CoUEMeshSection& ueSection = Chunk.GetUESection(iSection);
+			auto* ueIndexBuffers = ueSection.GetUEIndexBufferData();
+			for (auto iBuffer = 0; iBuffer < ueSection.GetUEIndexBufferCount(); ++iBuffer)
+				ueIndexBuffers[iBuffer].ReleaseResource();
+			auto* ueVertexBuffers = ueSection.GetUEVertexBufferData();
+			for (auto iBuffer = 0; iBuffer < ueSection.GetUEVertexBufferCount(); ++iBuffer)
+				ueVertexBuffers[iBuffer].ReleaseResource();
+		}
+
 		for (FNiMeshProxySection* Section : Sections)
 		{
 			if (Section != nullptr)
@@ -608,6 +1292,9 @@ public:
 #endif
 
 private:
+
+	MeshChunk Chunk;
+
 	TArray<FNiMeshProxySection*> Sections;
 
 	UBodySetup* BodySetup;
